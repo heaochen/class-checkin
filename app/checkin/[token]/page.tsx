@@ -21,32 +21,64 @@ export default function CheckinPage() {
   const [name, setName] = useState("");
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedbackAvailable, setFeedbackAvailable] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+
     async function loadMeeting() {
-      if (!supabase || !token) {
-        setIsLoading(false);
-        return;
-      }
-      const { data, error } = await supabase.rpc("get_checkin_meeting", {
-        p_meeting_token: token,
-      });
-      const record = Array.isArray(data) ? data[0] : data;
-      if (!error && record) {
+      try {
+        if (!supabase || !token) {
+          if (isMounted) setLoadError(true);
+          return;
+        }
+
+        const timeout = new Promise<never>((_, reject) => {
+          window.setTimeout(
+            () => reject(new Error("Loading public meeting timed out")),
+            10000,
+          );
+        });
+        const request = supabase.rpc("get_checkin_meeting", {
+          p_meeting_token: token,
+        });
+        const { data, error } = await Promise.race([request, timeout]);
+
+        if (error) throw error;
+        const record = Array.isArray(data) ? data[0] : data;
+        if (!record) {
+          if (isMounted) setMeeting(null);
+          return;
+        }
+
         const loadedMeeting = record as CheckinMeeting;
-        setMeeting(loadedMeeting);
-        setStatus(
-          getMeetingStatus(
-            loadedMeeting.checkin_start,
-            loadedMeeting.checkin_end,
-          ),
-        );
+        if (isMounted) {
+          setMeeting(loadedMeeting);
+          setStatus(
+            getMeetingStatus(
+              loadedMeeting.checkin_start,
+              loadedMeeting.checkin_end,
+            ),
+          );
+        }
+      } catch (cause) {
+        console.error("Failed to load public meeting", cause);
+        if (isMounted) {
+          setLoadError(true);
+          setMeeting(null);
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
-      setIsLoading(false);
     }
+
     void loadMeeting();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token]);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -97,6 +129,10 @@ export default function CheckinPage() {
 
   if (isLoading) {
     return <PageMessage>正在加载签到信息...</PageMessage>;
+  }
+
+  if (loadError) {
+    return <PageMessage>签到信息加载失败，请刷新重试</PageMessage>;
   }
 
   if (!meeting) {
