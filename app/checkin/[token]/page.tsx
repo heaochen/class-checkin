@@ -58,8 +58,8 @@ export default function CheckinPage() {
           setMeeting(loadedMeeting);
           setStatus(
             getMeetingStatus(
-              loadedMeeting.checkin_start,
-              loadedMeeting.checkin_end,
+              toBrowserDateValue(loadedMeeting.checkin_start),
+              toBrowserDateValue(loadedMeeting.checkin_end),
             ),
           );
         }
@@ -219,7 +219,21 @@ export default function CheckinPage() {
 
 function formatCheckinTime(value: string | null) {
   if (!value) return "未知时间";
-  return new Date(value).toLocaleString("zh-CN");
+  const date = new Date(toBrowserDateValue(value));
+  return Number.isNaN(date.getTime())
+    ? "未知时间"
+    : date.toLocaleString("zh-CN");
+}
+
+function toBrowserDateValue(value: string) {
+  const normalized = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return `${normalized}T00:00:00`;
+  }
+  if (normalized.includes(" ") && !normalized.includes("T")) {
+    return normalized.replace(" ", "T");
+  }
+  return normalized;
 }
 
 function PageMessage({ children }: { children: string }) {
