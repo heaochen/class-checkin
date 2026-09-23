@@ -75,50 +75,66 @@ export default function CheckinClient({ token, debug }: CheckinClientProps) {
     window.addEventListener("error", handleError);
     window.addEventListener("unhandledrejection", handleUnhandledRejection);
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    const startId = setTimeout(() => {
-      setDebugInfo((current) => ({
-        ...current,
-        userAgent: window.navigator.userAgent,
-        currentUrl: window.location.href,
-        hydrated: true,
-        step: 2,
-      }));
-      void loadMeeting();
-    }, 0);
     let isMounted = true;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      controller.abort();
+    }, 15000);
     const fetchUrl = `/api/checkin/${encodeURIComponent(token)}/meeting`;
 
-    async function loadMeeting() {
+    const loadMeeting = async () => {
       try {
         setDebugInfo((current) => ({
           ...current,
+          userAgent: window.navigator.userAgent,
+          currentUrl: window.location.href,
+          hydrated: true,
           fetchStarted: true,
           fetchUrl,
-          step: 3,
+          step: 2,
         }));
-        const response = await fetch(fetchUrl, { signal: controller.signal });
+
+        const response = await fetch(fetchUrl, {
+          signal: controller.signal,
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: {
+            Accept: "application/json",
+          },
+        });
+
         setDebugInfo((current) => ({
           ...current,
           fetchReturned: true,
           httpStatus: String(response.status),
-          step: 4,
+          step: 3,
         }));
-        if (!response.ok) throw new Error("Failed to load public meeting");
+
+        if (!response.ok) {
+          throw new Error(
+            `Public meeting request failed with ${response.status}`,
+          );
+        }
+
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error("Unexpected response format");
+        }
 
         const loadedMeeting = (await response.json()) as CheckinMeeting;
         setDebugInfo((current) => ({
           ...current,
           jsonParsed: true,
-          step: 5,
+          step: 4,
         }));
+
         if (!isMounted) return;
         if (!loadedMeeting.title || !loadedMeeting.status) {
           throw new Error("Invalid public meeting response");
         }
+
         setMeeting(loadedMeeting);
-        setDebugInfo((current) => ({ ...current, step: 6 }));
+        setDebugInfo((current) => ({ ...current, step: 5 }));
       } catch (cause) {
         console.error("Failed to load public meeting", cause);
         if (isMounted) {
@@ -126,23 +142,24 @@ export default function CheckinClient({ token, debug }: CheckinClientProps) {
           setMeeting(null);
         }
       } finally {
-        clearTimeout(timeoutId);
+        window.clearTimeout(timeoutId);
         if (isMounted) {
           setIsLoading(false);
           setDebugInfo((current) => ({
             ...current,
             loading: false,
-            step: 7,
+            step: 6,
           }));
         }
       }
-    }
+    };
+
+    void loadMeeting();
 
     return () => {
       isMounted = false;
       controller.abort();
-      clearTimeout(timeoutId);
-      clearTimeout(startId);
+      window.clearTimeout(timeoutId);
       window.removeEventListener("error", handleError);
       window.removeEventListener(
         "unhandledrejection",
@@ -168,14 +185,23 @@ export default function CheckinClient({ token, debug }: CheckinClientProps) {
         `/api/checkin/${encodeURIComponent(token)}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           body: JSON.stringify({
             student_id: studentId.trim(),
             name: name.trim(),
           }),
           signal: controller.signal,
+          cache: "no-store",
+          credentials: "same-origin",
         },
       );
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("Unexpected check-in response format");
+      }
       const data = (await response.json()) as {
         status?: string;
         checkin_time?: string | null;

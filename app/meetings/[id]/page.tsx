@@ -323,9 +323,7 @@ export default function MeetingDetailPage() {
       <section className="mb-7 rounded-2xl border border-[#e8ecf3] bg-white p-6 shadow-[0_6px_24px_rgba(31,49,82,0.035)]">
         <div className="flex flex-col gap-4">
           <div>
-            <h2 className="text-base font-bold text-[#17233a]">
-              学生考勤链接
-            </h2>
+            <h2 className="text-base font-bold text-[#17233a]">学生考勤链接</h2>
             <p className="mt-2 text-xs text-[#9aa5b7]">
               复制链接后，可使用任意静态二维码生成工具制作二维码。
             </p>
