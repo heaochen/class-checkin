@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { exportMeetingWorkbook } from "@/lib/export";
 import {
   getMeetingStatus,
@@ -20,7 +19,6 @@ export default function MeetingDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [origin, setOrigin] = useState("");
-  const [isQrLarge, setIsQrLarge] = useState(false);
   const [copyMessage, setCopyMessage] = useState("");
   const [members, setMembers] = useState<Member[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
@@ -134,12 +132,22 @@ export default function MeetingDetailPage() {
       ).toFixed(1)
     : "暂无";
   const memberById = new Map(members.map((member) => [member.id, member]));
-  const checkinUrl = `${origin || ""}/checkin/${meeting.checkin_token}`;
+  const checkinPath = `/checkin/${meeting.checkin_token}`;
+  const resolvedOrigin = (
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/+$/, "") ||
+    origin ||
+    (typeof window !== "undefined" ? window.location.origin : "")
+  ).replace(/\/+$/, "");
+  const checkinUrl = `${resolvedOrigin}${checkinPath}`;
 
   async function copyCheckinUrl() {
     await navigator.clipboard.writeText(checkinUrl);
-    setCopyMessage("签到链接已复制");
+    setCopyMessage("考勤链接已复制");
     window.setTimeout(() => setCopyMessage(""), 2000);
+  }
+
+  function openCheckinPage() {
+    window.open(checkinUrl, "_blank", "noopener,noreferrer");
   }
 
   async function manuallyCheckIn(member: Member) {
@@ -312,39 +320,44 @@ export default function MeetingDetailPage() {
           </p>
         </div>
       </div>
-      <section className="mb-7 flex flex-col items-center rounded-2xl border border-[#e8ecf3] bg-white p-6 text-center shadow-[0_6px_24px_rgba(31,49,82,0.035)]">
-        <h2 className="text-base font-bold text-[#17233a]">学生签到二维码</h2>
-        <p className="mt-2 text-xs text-[#9aa5b7]">扫码打开公开签到页面</p>
-        <div className="mt-5 rounded-2xl border border-[#edf0f5] bg-white p-4">
-          <QRCodeSVG
-            value={checkinUrl}
-            size={isQrLarge ? 320 : 220}
-            level="M"
-            className="h-auto max-w-full"
-          />
+      <section className="mb-7 rounded-2xl border border-[#e8ecf3] bg-white p-6 shadow-[0_6px_24px_rgba(31,49,82,0.035)]">
+        <div className="flex flex-col gap-4">
+          <div>
+            <h2 className="text-base font-bold text-[#17233a]">
+              学生考勤链接
+            </h2>
+            <p className="mt-2 text-xs text-[#9aa5b7]">
+              复制链接后，可使用任意静态二维码生成工具制作二维码。
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-[#edf0f5] bg-[#f9fbff] p-4">
+            <p className="max-w-full break-all text-sm font-medium text-[#2f3d52]">
+              {checkinUrl}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => void copyCheckinUrl()}
+              className="flex h-10 cursor-pointer items-center justify-center rounded-xl border border-[#dfe6f1] px-4 text-sm font-semibold text-[#61718b] transition-colors hover:border-[#c8d7ef] hover:bg-[#fafcff]"
+            >
+              复制考勤链接
+            </button>
+            <button
+              type="button"
+              onClick={openCheckinPage}
+              className="flex h-10 cursor-pointer items-center justify-center rounded-xl bg-[#5b8def] px-4 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-colors hover:bg-[#4d7fdc]"
+            >
+              打开考勤页面
+            </button>
+          </div>
+
+          {copyMessage && (
+            <p className="text-xs text-[#43a278]">{copyMessage}</p>
+          )}
         </div>
-        <p className="mt-4 max-w-full break-all text-xs text-[#71819a]">
-          {checkinUrl}
-        </p>
-        <div className="mt-5 flex flex-wrap justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => void copyCheckinUrl()}
-            className="flex h-10 cursor-pointer items-center justify-center rounded-xl border border-[#dfe6f1] px-4 text-sm font-semibold text-[#61718b] transition-colors hover:border-[#c8d7ef] hover:bg-[#fafcff]"
-          >
-            复制签到链接
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsQrLarge((current) => !current)}
-            className="flex h-10 cursor-pointer items-center justify-center rounded-xl bg-[#5b8def] px-4 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-colors hover:bg-[#4d7fdc]"
-          >
-            {isQrLarge ? "缩小二维码" : "放大二维码"}
-          </button>
-        </div>
-        {copyMessage && (
-          <p className="mt-3 text-xs text-[#43a278]">{copyMessage}</p>
-        )}
       </section>
       <div className="mb-7 grid gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-[#e8ecf3] bg-white p-5 shadow-[0_6px_24px_rgba(31,49,82,0.035)]">
